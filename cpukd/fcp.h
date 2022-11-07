@@ -20,13 +20,6 @@
 
 namespace cpukd {
 
-  struct float3 { float x, y, z; };
-  struct float4 { float x, y, z, w; };
-  inline float3 make_float3(float x, float y, float z) { return {x,y,z}; }
-  inline float4 make_float4(float x, float y, float z, float w) { return {x,y,z,w}; }
-
-  template<typename T> struct point_traits;
-
   inline static int levelOf(int nodeID)
   {
 #ifdef __CUDA_ARCH__
@@ -36,49 +29,26 @@ namespace cpukd {
 #endif
     return k;
   }
-  
-  template<> struct point_traits<float3> { enum { numDims = 3 }; };
-  template<> struct point_traits<float4> { enum { numDims = 4 }; };
-  
-  inline 
-  float dot(float4 a, float4 b) { return a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w; }
-  
-  inline 
-  float4 sub(float4 a, float4 b) { return make_float4(a.x-b.x,a.y-b.y,a.z-b.z,a.w-b.w); }
-  
-  inline 
-  float sqr_distance(float4 a, float4 b)
-  {
-    return dot(sub(a,b),sub(a,b)); 
-  }
 
-  inline 
-  float distance(float4 a, float4 b)
+  template<typename scalar_t> scalar_t sqrt(scalar_t v);
+  template<> float sqrt(float v) { return ::sqrtf(v); }
+  template<> double sqrt(double v) { return ::sqrt(v); }
+  
+  template<typename point_t, typename scalar_t, int numDims>
+  inline scalar_t distance(const point_t &a, const point_t &b)
   {
-    return sqrtf(sqr_distance(a,b));
+    scalar_t dot = scalar_t(0);
+    for (int i=0;i<numDims;i++) {
+      scalar_t a_i = ((const scalar_t*)&a)[i];
+      scalar_t b_i = ((const scalar_t*)&b)[i];
+      dot += (b_i-a_i)*(b_i-a_i);
+    }
+    return sqrt<scalar_t>(dot);
   }
   
-  inline 
-  float dot(float3 a, float3 b) { return a.x*b.x+a.y*b.y+a.z*b.z; }
-  
-  inline 
-  float3 sub(float3 a, float3 b) { return make_float3(a.x-b.x,a.y-b.y,a.z-b.z); }
-  
-  inline 
-  float sqr_distance(float3 a, float3 b)
-  {
-    return dot(sub(a,b),sub(a,b)); 
-  }
-
-  inline 
-  float distance(float3 a, float3 b)
-  {
-    return sqrtf(sqr_distance(a,b));
-  }
-
-  template<typename point_t = float4>
+  template<typename point_t, typename scalar_t, int numDims>
   inline
-  int fcp(float4 queryPoint,
+  int fcp(point_t queryPoint,
           const point_t *d_nodes,
           int N)
   {
@@ -105,7 +75,7 @@ namespace cpukd {
       const int  child = 2*curr+1;
       const bool from_child = (prev >= child);
       if (!from_child) {
-        float dist = distance(queryPoint,d_nodes[curr]);
+        float dist = distance<point_t,scalar_t,numDims>(queryPoint,d_nodes[curr]);
         if (dist < closest_dist_found_so_far) {
           closest_dist_found_so_far = dist;
           closest_found_so_far      = curr;
@@ -113,8 +83,8 @@ namespace cpukd {
       }
 
       const auto &curr_node = d_nodes[curr];
-      const int   curr_dim = levelOf(curr) % point_traits<point_t>::numDims;
-      const float curr_dim_dist = (&queryPoint.x)[curr_dim] - (&curr_node.x)[curr_dim];
+      const int   curr_dim = levelOf(curr) % numDims;
+      const float curr_dim_dist = ((scalar_t*)&queryPoint)[curr_dim] - ((scalar_t*)&curr_node)[curr_dim];
       const int   curr_side = curr_dim_dist > 0.f;
       const int   curr_close_child = 2*curr + 1 + curr_side;
       const int   curr_far_child   = 2*curr + 2 - curr_side;

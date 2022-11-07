@@ -21,6 +21,53 @@
 
 using namespace cpukd;
 
+  struct float3 { float x, y, z; };
+  struct float4 { float x, y, z, w; };
+  inline float3 make_float3(float x, float y, float z) { return {x,y,z}; }
+  inline float4 make_float4(float x, float y, float z, float w) { return {x,y,z,w}; }
+
+  template<typename T> struct point_traits;
+
+
+template<> struct point_traits<float3> { enum { numDims = 3 }; };
+  template<> struct point_traits<float4> { enum { numDims = 4 }; };
+  
+  inline 
+  float dot(float4 a, float4 b) { return a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w; }
+  
+  inline 
+  float4 sub(float4 a, float4 b) { return make_float4(a.x-b.x,a.y-b.y,a.z-b.z,a.w-b.w); }
+  
+  inline 
+  float sqr_distance(float4 a, float4 b)
+  {
+    return dot(sub(a,b),sub(a,b)); 
+  }
+
+  inline 
+  float distance(float4 a, float4 b)
+  {
+    return sqrtf(sqr_distance(a,b));
+  }
+  
+  inline 
+  float dot(float3 a, float3 b) { return a.x*b.x+a.y*b.y+a.z*b.z; }
+  
+  inline 
+  float3 sub(float3 a, float3 b) { return make_float3(a.x-b.x,a.y-b.y,a.z-b.z); }
+  
+  inline 
+  float sqr_distance(float3 a, float3 b)
+  {
+    return dot(sub(a,b),sub(a,b)); 
+  }
+
+  inline 
+  float distance(float3 a, float3 b)
+  {
+    return sqrtf(sqr_distance(a,b));
+  }
+
 float4 *generatePoints(int N)
 {
   std::cout << "generating " << N <<  " points" << std::endl;
@@ -44,7 +91,7 @@ void fcp(int *d_results,
     (0,numQueries,1024,
      [&](int begin, int end) {
        for (int i=begin;i<end;i++)
-         d_results[i] = cpukd::fcp(d_queries[i],d_nodes,numNodes);
+         d_results[i] = cpukd::fcp<float4,float,4>(d_queries[i],d_nodes,numNodes);
      });
 }
 
@@ -140,9 +187,9 @@ int main(int ac, const char **av)
       if (d_results[i] == -1) continue;
       
       float4 qp = d_queries[i];
-      float reportedDist = cpukd::distance(qp,d_points[d_results[i]]);
+      float reportedDist = distance(qp,d_points[d_results[i]]);
       for (int j=0;j<nPoints;j++) {
-        float dist_j = cpukd::distance(qp,d_points[j]);
+        float dist_j = distance(qp,d_points[j]);
         if (dist_j < reportedDist) {
           printf("for query %i: found offending point %i (%f %f %f %f) with dist %f (vs %f)\n",
                  i,
