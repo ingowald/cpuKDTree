@@ -27,6 +27,16 @@ namespace cpukd {
 
   template<typename T> struct point_traits;
 
+  inline static int levelOf(int nodeID)
+  {
+#ifdef __CUDA_ARCH__
+    int k = 63 - __clzll(nodeID+1);
+#else
+    int k = 63 - __builtin_clzll(nodeID+1);
+#endif
+    return k;
+  }
+  
   template<> struct point_traits<float3> { enum { numDims = 3 }; };
   template<> struct point_traits<float4> { enum { numDims = 4 }; };
   
@@ -103,7 +113,7 @@ namespace cpukd {
       }
 
       const auto &curr_node = d_nodes[curr];
-      const int   curr_dim = BinaryTree::levelOf(curr) % point_traits<point_t>::numDims;
+      const int   curr_dim = levelOf(curr) % point_traits<point_t>::numDims;
       const float curr_dim_dist = (&queryPoint.x)[curr_dim] - (&curr_node.x)[curr_dim];
       const int   curr_side = curr_dim_dist > 0.f;
       const int   curr_close_child = 2*curr + 1 + curr_side;

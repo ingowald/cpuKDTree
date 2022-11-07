@@ -84,7 +84,7 @@ bool checkTree(float4 *d_points, int N, int curr=0)
 {
   if (curr >= N) return true;
 
-  int dim = cpukd::BinaryTree::levelOf(curr)%4;
+  int dim = cpukd::levelOf(curr)%4;
   float value = (&d_points[curr].x)[dim];
   
   if (!noneAbove(d_points,N,2*curr+1,dim,value))
