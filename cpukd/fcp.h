@@ -45,7 +45,61 @@ namespace cpukd {
     }
     return sqrt<scalar_t>(dot);
   }
-  
+
+#if 1
+    /*! manual stack based implementation */
+  template<typename point_t, typename scalar_t, int numDims>
+  inline
+  int fcp(point_t queryPoint,
+          const point_t *d_nodes,
+          int N)
+  {
+    if (N == 0) return -1;
+
+    int   closest_found_so_far = -1;
+    float closest_dist_found_so_far = std::numeric_limits<float>::infinity();
+    
+    std::pair<int,float> stack[40];
+    int stackPtr = 0;
+    
+    int curr = 0;
+    while (1) {
+      while (curr < N) {
+        float dist = distance<point_t,scalar_t,numDims>(queryPoint,d_nodes[curr]);
+        if (dist < closest_dist_found_so_far) {
+          closest_dist_found_so_far = dist;
+          closest_found_so_far      = curr;
+        }
+        
+        const auto &curr_node = d_nodes[curr];
+        const int   curr_dim = levelOf(curr) % numDims;
+        const float curr_dim_dist = ((scalar_t*)&queryPoint)[curr_dim] - ((scalar_t*)&curr_node)[curr_dim];
+        const int   curr_side = curr_dim_dist > 0.f;
+        const int   curr_close_child = 2*curr + 1 + curr_side;
+        const int   curr_far_child   = 2*curr + 2 - curr_side;
+
+        const float abs_dim_dist = fabsf(curr_dim_dist);
+
+        if ((curr_far_child<N) && (abs_dim_dist < closest_dist_found_so_far)) {
+          stack[stackPtr++] = { curr_far_child, abs_dim_dist };
+        }
+
+        curr = curr_close_child;
+      }
+      // pop next from stack ...
+      while (1) {
+        if (stackPtr == 0) 
+          return closest_found_so_far;
+        -- stackPtr;
+        if (stack[stackPtr].second > closest_dist_found_so_far)
+          continue;
+        curr = stack[stackPtr].first;
+        break;
+      }
+    }
+  }
+#else
+    /*! stack-less implementation */
   template<typename point_t, typename scalar_t, int numDims>
   inline
   int fcp(point_t queryPoint,
@@ -128,6 +182,6 @@ namespace cpukd {
       curr = next;
     }
   }
-  
+#endif  
 } // ::cpukd
 
