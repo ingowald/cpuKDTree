@@ -15,6 +15,7 @@
 // ======================================================================== //
 
 #include "cpukd/builder.h"
+#include "parallel_for.h"
 // fcp = "find closest point" query
 #include "cpukd/fcp.h"
 
@@ -33,27 +34,12 @@ float4 *generatePoints(int N)
   return d_points;
 }
 
-// __global__ void d_fcp(int *d_results,
-//                     float4 *d_queries,
-//                     int numQueries,
-//                     float4 *d_nodes,
-//                     int numNodes)
-// {
-//   int tid = threadIdx.x+blockIdx.x*blockDim.x;
-//   if (tid >= numQueries) return;
-
-//   d_results[tid] = cpukd::fcp(d_queries[tid],d_nodes,numNodes);
-// }
-
 void fcp(int *d_results,
          float4 *d_queries,
          int numQueries,
          float4 *d_nodes,
          int numNodes)
 {
-  // int bs = 128;
-  // int nb = cpukd::common::divRoundUp(numQueries,bs);
-  // d_fcp<<<nb,bs>>>(d_results,d_queries,numQueries,d_nodes,numNodes);
   cpukd::common::parallel_for_blocked
     (0,numQueries,1024,
      [&](int begin, int end) {
@@ -104,7 +90,6 @@ int main(int ac, const char **av)
   
   int nPoints = 173;
   bool verify = false;
-  // float maxQueryRadius = std::numeric_limits<float>::infinity();
   int nRepeats = 1;
   for (int i=1;i<ac;i++) {
     std::string arg = av[i];
@@ -114,8 +99,6 @@ int main(int ac, const char **av)
       verify = true;
     else if (arg == "-nr")
       nRepeats = atoi(av[++i]);
-    // else if (arg == "-r")
-    //   maxQueryRadius = std::stof(av[++i]);
     else
       throw std::runtime_error("known cmdline arg "+arg);
   }
